@@ -112,6 +112,7 @@ class Star:
         """If the Star object has a name that matches one of the id's in
         a Data object, the information from Data will be given to Star.
         """
+
         #idx must correspond to a unique id; hence the [0][0]
         try:
             idx = np.where(Data.star_data['id'] == self.name)[0][0]
@@ -137,11 +138,23 @@ class Star:
         #if hasattr(Data, 'lines'):
         if Data.lines:
             idx = np.where(Data.lines[self.name] >= 0)
-            self.linelist = {'wavelength': Data.lines['wavelength'][idx],
+
+            # LM Added by me
+            if self.name+'_err' in Data.lines:
+                idy = np.where(Data.lines[self.name+'_err'] >= 0)
+                self.linelist = {'wavelength': Data.lines['wavelength'][idx],
                              'species': Data.lines['species'][idx],
                              'ep': Data.lines['ep'][idx],
                              'gf': Data.lines['gf'][idx],
-                             'ew': Data.lines[self.name][idx]}
+                             'ew': Data.lines[self.name][idx],
+                             'ew_e': Data.lines[self.name+'_err'][idy]}
+            else:
+                self.linelist = {'wavelength': Data.lines['wavelength'][idx],
+                             'species': Data.lines['species'][idx],
+                             'ep': Data.lines['ep'][idx],
+                             'gf': Data.lines['gf'][idx],
+                             'ew': Data.lines[self.name][idx],
+                             'ew_e': Data.lines[self.name][idx]*0+1.0000}
             logger.info('Attribute linelist added to star object.')
         else:
             logger.warning('There is no line data to attach to Star object.')

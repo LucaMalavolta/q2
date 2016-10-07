@@ -1,9 +1,11 @@
 import numpy as np
 import os
 import logging
+import tempfile
 from config import *
 
 logger = logging.getLogger(__name__)
+temp_dir = tempfile.mkdtemp(dir='./')
 
 
 class Driver:
@@ -16,8 +18,10 @@ class Driver:
         self.lines_in = 'lines.in'
         self.plot = 0
         self.hfs_species = None
+        #batch.par, MOOG and temporary files are stored in a random temprary directory
+        #so that multipple instance on q2 can run in the same directory
 
-    def create_file(self, file_name="batch.par"):
+    def create_file(self, file_name=self.temp_dir+"batch.par"):
         """Creates the MOOG driver file."""
         self.file_name = file_name
         f = open(file_name, 'w')
@@ -48,7 +52,7 @@ class Driver:
         f.close()
 
 
-def create_model_in(Star, file_name='model.in'):
+def create_model_in(Star, file_name=temp_dir+'model.in'):
     """Creates a model atmosphere file for MOOG from the model_atmosphere
     attribute of a Star object.
     """
@@ -68,14 +72,14 @@ def create_model_in(Star, file_name='model.in'):
     else:
         feh = Star.feh
 
-    with open('head.tmp', 'w') as f:
+    with open(temp_dir+'head.tmp', 'w') as f:
         f.write('KURUCZ\n')
         f.write('TEFF='+str(Star.teff)+',LOGG='+str(Star.logg)+
                 ',[FE/H]='+str(feh)+','+Star.model_atmosphere_grid+'\n')
         nd = len(Star.model_atmosphere['T'])
         f.write('ND=       '+str(nd)+'\n')
 
-    with open('body.tmp', 'w') as f:
+    with open(temp_dir+'body.tmp', 'w') as f:
         for idx in range(nd):
             f.write("{0:.8E} {1:.1F} {2:.3E} {3:.3E} {4:.3E}\n".format(\
                     Star.model_atmosphere['RHOX'][idx],\
@@ -85,7 +89,7 @@ def create_model_in(Star, file_name='model.in'):
                     Star.model_atmosphere['ABROSS'][idx])
                    )
 
-    with open('tail.tmp', 'w') as f:
+    with open(temp_dir+'tail.tmp', 'w') as f:
         f.write('%5.2F\n' %Star.vt)
         if Star.model_atmosphere_grid != 'marcs':
             path = os.path.join(MODATM_PATH, 'kurucz')
@@ -125,7 +129,7 @@ def create_model_in(Star, file_name='model.in'):
         f.write('  10108.0 60808.0\n')
         f.write('  6.1     7.1     8.1   12.1  22.1  26.1\n')
 
-    file_list = ['head.tmp', 'body.tmp', 'tail.tmp']
+    file_list = [temp_dir+'head.tmp', temp_dir+'body.tmp', temp_dir+'tail.tmp']
     with open(file_name, 'w') as outfile:
         for one_file in file_list:
             with open(one_file) as infile:
@@ -135,15 +139,16 @@ def create_model_in(Star, file_name='model.in'):
     logger.info('Moog infile model atmosphere created: '+file_name)
 
 
-def create_lines_in(Star, species=0, file_name='lines.in'):
+def create_lines_in(Star, species=0, file_name=temp_dir+'lines.in', add_error=False):
     """Creates a line list file for MOOG"""
+    """LM: Added flag to create a linelist with EWs increased by their errors"""
     if species > 0:
         idx = np.where(np.logical_and(Star.linelist['species'] == species,\
-                                       Star.linelist['ew'] >= 0))[0]
+                                       Star.linelist['ew'] >= 0.1))[0] #LucaMalavolta
     else:
         #species = 0 means all species
         idx = np.where(np.logical_and(Star.linelist['species'] > species,\
-                                       Star.linelist['ew'] >= 0))[0]
+                                       Star.linelist['ew'] >= 0.1))[0] #LucaMalavolta
 
     nlines = len(idx)
     if nlines == 0:
@@ -161,8 +166,24 @@ def create_lines_in(Star, species=0, file_name='lines.in'):
 
     with open(file_name, 'w') as f:
         f.write("MOOG linelist created by q2\n")
-        for lidx in idx:
-            f.write("{0:10.4f} {1:4.1f} {2:6.3f} {3:5.3f} 3 0 {4:5.1f}\n".format(\
+        if add_error:
+            print 'Adding errors to EWS - be careful! '
+            """LM: EWs are increased by their corresponding errors. Error on abundance due
+            to the error in EW will be calculated by subtracting the unperturbed
+            abundance from this value """
+            for lidx in idx:
+                f.write("{0:10.4f} {1:4.1f} {2:6.3f} {3:5.3f} 0 0 {4:5.1f}\n".format(\
+                    Star.linelist['wavelength'][lidx],\
+                    Star.linelist['species'][lidx],\
+                    Star.linelist['ep'][lidx],\
+                    Star.linelist['gf'][lidx],\
+                    Star.linelist['ew'][lidx]+Star.linelist['ew_r'][lidx])
+                   )
+                # LM switched from '3 0' to '0 0', ie use the Unsold approximation
+                # when Barklem values are not avaialble
+        else:
+            for lidx in idx:
+                f.write("{0:10.4f} {1:4.1f} {2:6.3f} {3:5.3f} 0 0 {4:5.1f}\n".format(\
                     Star.linelist['wavelength'][lidx],\
                     Star.linelist['species'][lidx],\
                     Star.linelist['ep'][lidx],\
@@ -176,9 +197,9 @@ def create_lines_in(Star, species=0, file_name='lines.in'):
     return True
 
 
-def abfind(Star, species, species_id):
+def abfind(Star, species, species_id, add_error=False):
     """Runs MOOG with abfind driver for a given Star and species
-    
+
     Star is a star object; must have all attributes in place
     species could be 26.0 for Fe I, for example
     species_id is a string that will become a new attribute for the Star object
@@ -186,6 +207,8 @@ def abfind(Star, species, species_id):
     s.fe2 #shows result from abfind
     MD is the moog driver object
     """
+    """LM: added a flag for the computation of perturbed abundances"""
+
     k = Star.linelist['species'] == species
     negs = [wx for wx in Star.linelist['wavelength'][k] if wx < 0]
     if len(negs) == 0:
@@ -193,21 +216,22 @@ def abfind(Star, species, species_id):
     else:
         MD = Driver() #hfs
         MD.hfs_species = str(round(species))
-    if not os.path.exists('.q2'):
-        os.mkdir('.q2')
-    MD.standard_out = os.path.join('.q2', 'moog.std')
-    MD.summary_out = os.path.join('.q2', 'moog.sum')
-    MD.model_in = os.path.join('.q2', 'model.in')
-    MD.lines_in = os.path.join('.q2', 'lines.in')
-    MD.create_file('batch.par')
+    if not os.path.exists(temp_dir):
+        os.mkdir(temp_dir)
+    #temporary files are saved into a temporary directoru
+    MD.standard_out = os.path.join(temp_dir, 'moog.std')
+    MD.summary_out = os.path.join(temp_dir, 'moog.sum')
+    MD.model_in = os.path.join(temp_dir, 'model.in')
+    MD.lines_in = os.path.join(temp_dir, 'lines.in')
+    MD.create_file(temp_dir+'batch.par')
 
     create_model_in(Star, file_name=MD.model_in)
     found_lines = create_lines_in(Star, species=species, file_name=MD.lines_in)
     if not found_lines:
         logger.warning('Did not run abfind (no lines found)')
         return False
-    logfile = os.path.join('.q2', 'moog.log')
-    os.system('MOOGSILENT > '+logfile+' 2>&1')
+    logfile = os.path.join(temp_dir, 'moog.log')
+    os.system('cd '+temp_dir+' && MOOGSILENT > '+logfile+' 2>&1')
     f = open(MD.summary_out, 'r')
     line, stop = '', False
     while line[0:10] != 'wavelength':
@@ -249,12 +273,17 @@ def abfind(Star, species, species_id):
     os.unlink(MD.summary_out)
     os.unlink(MD.standard_out)
     os.unlink(logfile)
-    if os.path.isfile('fort.99'):
-        os.unlink('fort.99')
+    if os.path.isfile(temp_dir+'fort.99'):
+        os.unlink(temp_dir+'fort.99')
 
-    x = {'ww': np.array(ww), 'ep': np.array(ep), 'ew': np.array(ew),\
-         'rew': np.array(rew), 'ab': np.array(ab), 'difab': np.array(difab)}
-    setattr(Star, species_id, x)
+    if add_error:
+        #ab_err = Star[species_id] ????
+        #Star[species_id]=
+        print 'Hey '
+    else:
+        x = {'ww': np.array(ww), 'ep': np.array(ep), 'ew': np.array(ew),\
+            'rew': np.array(rew), 'ab': np.array(ab), 'difab': np.array(difab)}
+        setattr(Star, species_id, x)
     logger.info('Successfully ran abfind')
     return True
 
@@ -278,7 +307,7 @@ def cog(Star, species, cog_id):
     if not found_lines:
         logger.warning('Did not run cog (no lines found)')
         return False
-    os.system('MOOGSILENT > moog.log 2>&1')
+    os.system('cd '+temp_dir+' && MOOGSILENT > moog.log 2>&1')
 
     f = open(MD.summary_out, 'r')
     line = f.readline()
@@ -304,6 +333,10 @@ def cog(Star, species, cog_id):
     os.unlink(MD.lines_in)
     os.unlink(MD.summary_out)
     os.unlink(MD.standard_out)
-    os.unlink('moog.log')
+    os.unlink(temp_dir+'moog.log')
 
     setattr(Star, cog_id, cog_obj)
+
+
+def delete_tempdir():
+    os.system('rm -r ' + temp_dir)

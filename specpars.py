@@ -22,7 +22,7 @@ class SolvePars:
         self.step_vt = 0.32
         self.niter = 50
         self.grid = grid
-        self.solar_afe = 7.45
+        self.solar_afe = 7.50
         self.errors = False
         self.check_converged = True
         self.ignore = []
@@ -106,14 +106,14 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
     mafe = np.mean(list(afe1)+list(afe2))
     eafe = np.std(list(afe1)+list(afe2))
     nfe1, nfe2 = len(afe1), len(afe2)
- 
+
     zero_ep, slope_ep, err_slope_ep = linfit(ep1, afe1)
     zero_rew, slope_rew, err_slope_rew = linfit(rew1, afe1)
     x_epfit = np.array([min(ep1), max(ep1)])
     y_epfit = zero_ep + slope_ep*x_epfit
     x_rewfit = np.array([min(rew1), max(rew1)])
     y_rewfit = zero_rew + slope_rew*x_rewfit
- 
+
     if plot:
         logger.info('Making figure')
         plt.figure(figsize=(7, 9))
@@ -391,7 +391,7 @@ def solve_one(Star, SolveParsInit, Ref=object, PlotPars=object):
 
 
 def solve_all(Data, SolveParsInit, output_file, reference_star=None,
-              PlotPars=object):
+              PlotPars=object, ultra_verbose=False): #LM Added ultra_verbose
     print '------------------------------------------------------'
     print 'Initializing ...'
     start_time = datetime.datetime.now()
@@ -482,6 +482,22 @@ def solve_all(Data, SolveParsInit, output_file, reference_star=None,
                           s.sp_err['teff'], s.sp_err['logg'],
                           s.sp_err['afe'], s.sp_err['vt']
                           ))
+
+        if ultra_verbose:
+            print "[Fe/H](Fe I)  = {0:5.3f} +/- {1:5.3f}".\
+                  format(s.iron_stats['afe1'], s.iron_stats['err_afe1'])
+            print "[Fe/H](Fe II) = {0:5.3f} +/- {1:5.3f}".\
+                  format(s.iron_stats['afe2'], s.iron_stats['err_afe2'])
+            print "A(FeI) vs. EP slope  = {0:.6f}".format(s.iron_stats['slope_ep'])
+            print "A(FeI) vs. REW slope = {0:.6f}".format(s.iron_stats['slope_rew'])
+
+            print "Final stellar parameters:"
+            print "Teff = {0:4.2f} +/- {1:4.2f} K".format(s.teff, s.sp_err['teff'])
+            print "logg = {0:4.2f} +/- {1:4.2f} dex".format(s.logg, s.sp_err['logg'])
+            print " vt = {0:4.2f} +/- {1:4.2f} km/s".format(s.vt, s.sp_err['vt'])
+            print "[Fe/H]= {0:5.2f} +/- {1:4.2f} dex".format(s.feh, s.sp_err['afe'])
+            
+
     fout.close()
 
     print ''
@@ -499,7 +515,7 @@ def solve_all(Data, SolveParsInit, output_file, reference_star=None,
 
 def make_single_solution_table(solution_files, single_solution_file):
     """Takes q2.specpars.solve_all outputs and creates a single final one
-    
+
     Files must be in the order in which they were computed!
     """
     #solution_files = ['starsDec_solution1.csv', 'starsDec_solution2.csv']
@@ -531,7 +547,7 @@ def make_single_solution_table(solution_files, single_solution_file):
 
 def fancy_ironstats_plot(Star):
     """Makes bokeh hover-ing plots
-    
+
     Function written to look for outliers and investigate line-to-line scatter
     """
     if not hasattr(Star, 'iron_stats'):
