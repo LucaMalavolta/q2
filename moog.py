@@ -5,7 +5,10 @@ import tempfile
 from config import *
 
 logger = logging.getLogger(__name__)
-temp_dir = tempfile.mkdtemp(dir='./')
+
+temp_dir = tempfile.mkdtemp(dir='./', prefix='.tmp_moog_')
+temp_dir += '/'
+print 'Remember to clean up hidden directory '+temp_dir+' if exit abnormally'
 
 
 class Driver:
@@ -18,13 +21,13 @@ class Driver:
         self.lines_in = 'lines.in'
         self.plot = 0
         self.hfs_species = None
-        #batch.par, MOOG and temporary files are stored in a random temprary directory
-        #so that multipple instance on q2 can run in the same directory
+        # batch.par, MOOG and temporary files are stored in a random temprary directory
+        # so that multipple instance on q2 can run in the same directory
 
-    def create_file(self, file_name=self.temp_dir+"batch.par"):
+    def create_file(self, file_name="batch.par", temporary_dir=''):
         """Creates the MOOG driver file."""
         self.file_name = file_name
-        f = open(file_name, 'w')
+        f = open(temporary_dir+file_name, 'w')
         if self.mode == 'abfind':
             if self.hfs_species:
                 f.write('blends\n')
@@ -52,7 +55,7 @@ class Driver:
         f.close()
 
 
-def create_model_in(Star, file_name=temp_dir+'model.in'):
+def create_model_in(Star, file_name='model.in', temporary_dir=''):
     """Creates a model atmosphere file for MOOG from the model_atmosphere
     attribute of a Star object.
     """
@@ -62,7 +65,7 @@ def create_model_in(Star, file_name=temp_dir+'model.in'):
         logger.error('Moog model_in file requires a microturbulence (vt)')
         return None
     if hasattr(Star, 'model_atmosphere'):
-        Star.moog_model_in_name = file_name
+        Star.moog_model_in_name = temporary_dir + file_name
     else:
         logger.error('No model data to write to moog model_in file.')
         return None
@@ -72,14 +75,14 @@ def create_model_in(Star, file_name=temp_dir+'model.in'):
     else:
         feh = Star.feh
 
-    with open(temp_dir+'head.tmp', 'w') as f:
+    with open(temporary_dir+'head.tmp', 'w') as f:
         f.write('KURUCZ\n')
         f.write('TEFF='+str(Star.teff)+',LOGG='+str(Star.logg)+
                 ',[FE/H]='+str(feh)+','+Star.model_atmosphere_grid+'\n')
         nd = len(Star.model_atmosphere['T'])
         f.write('ND=       '+str(nd)+'\n')
 
-    with open(temp_dir+'body.tmp', 'w') as f:
+    with open(temporary_dir+'body.tmp', 'w') as f:
         for idx in range(nd):
             f.write("{0:.8E} {1:.1F} {2:.3E} {3:.3E} {4:.3E}\n".format(\
                     Star.model_atmosphere['RHOX'][idx],\
@@ -89,7 +92,7 @@ def create_model_in(Star, file_name=temp_dir+'model.in'):
                     Star.model_atmosphere['ABROSS'][idx])
                    )
 
-    with open(temp_dir+'tail.tmp', 'w') as f:
+    with open(temporary_dir+'tail.tmp', 'w') as f:
         f.write('%5.2F\n' %Star.vt)
         if Star.model_atmosphere_grid != 'marcs':
             path = os.path.join(MODATM_PATH, 'kurucz')
@@ -129,8 +132,8 @@ def create_model_in(Star, file_name=temp_dir+'model.in'):
         f.write('  10108.0 60808.0\n')
         f.write('  6.1     7.1     8.1   12.1  22.1  26.1\n')
 
-    file_list = [temp_dir+'head.tmp', temp_dir+'body.tmp', temp_dir+'tail.tmp']
-    with open(file_name, 'w') as outfile:
+    file_list = [temporary_dir+'head.tmp', temporary_dir+'body.tmp', temporary_dir+'tail.tmp']
+    with open(temporary_dir+file_name, 'w') as outfile:
         for one_file in file_list:
             with open(one_file) as infile:
                 outfile.write(infile.read())
@@ -139,7 +142,7 @@ def create_model_in(Star, file_name=temp_dir+'model.in'):
     logger.info('Moog infile model atmosphere created: '+file_name)
 
 
-def create_lines_in(Star, species=0, file_name=temp_dir+'lines.in', add_error=False):
+def create_lines_in(Star, species=0, file_name='lines.in', add_error=False, temporary_dir=''):
     """Creates a line list file for MOOG"""
     """LM: Added flag to create a linelist with EWs increased by their errors"""
     if species > 0:
@@ -164,7 +167,7 @@ def create_lines_in(Star, species=0, file_name=temp_dir+'lines.in', add_error=Fa
         Star.linelist['gf'][idx] = gf10
     #Star.linelist['gf'][idx] = gf_values
 
-    with open(file_name, 'w') as f:
+    with open(temporary_dir+file_name, 'w') as f:
         f.write("MOOG linelist created by q2\n")
         if add_error:
             print 'Adding errors to EWS - be careful! '
@@ -219,20 +222,22 @@ def abfind(Star, species, species_id, add_error=False):
     if not os.path.exists(temp_dir):
         os.mkdir(temp_dir)
     #temporary files are saved into a temporary directoru
-    MD.standard_out = os.path.join(temp_dir, 'moog.std')
-    MD.summary_out = os.path.join(temp_dir, 'moog.sum')
-    MD.model_in = os.path.join(temp_dir, 'model.in')
-    MD.lines_in = os.path.join(temp_dir, 'lines.in')
-    MD.create_file(temp_dir+'batch.par')
+    #MD.standard_out = os.path.join('.q2', 'moog.std')
+    #MD.summary_out = os.path.join('.q2', 'moog.sum')
+    #MD.model_in = os.path.join('.q2', 'model.in')
+    #MD.lines_in = os.path.join('.q2', 'lines.in')
+    MD.create_file('batch.par',temporary_dir=temp_dir)
 
-    create_model_in(Star, file_name=MD.model_in)
-    found_lines = create_lines_in(Star, species=species, file_name=MD.lines_in)
+    create_model_in(Star, file_name=MD.model_in, temporary_dir=temp_dir)
+    found_lines = create_lines_in(Star, species=species, file_name=MD.lines_in, temporary_dir=temp_dir)
     if not found_lines:
         logger.warning('Did not run abfind (no lines found)')
         return False
-    logfile = os.path.join(temp_dir, 'moog.log')
-    os.system('cd '+temp_dir+' && MOOGSILENT > '+logfile+' 2>&1')
-    f = open(MD.summary_out, 'r')
+    logfile ='moog.log'
+    os.chdir(temp_dir)
+    os.system('MOOGSILENT > '+logfile+' 2>&1 ')
+    os.chdir('../')
+    f = open(temp_dir + MD.summary_out, 'r')
     line, stop = '', False
     while line[0:10] != 'wavelength':
         line = f.readline()
@@ -267,12 +272,12 @@ def abfind(Star, species, species_id, add_error=False):
                 break
             stop = True
     f.close()
-    os.unlink(MD.file_name)
-    os.unlink(MD.model_in)
-    os.unlink(MD.lines_in)
-    os.unlink(MD.summary_out)
-    os.unlink(MD.standard_out)
-    os.unlink(logfile)
+    os.unlink(temp_dir+MD.file_name)
+    os.unlink(temp_dir+MD.model_in)
+    os.unlink(temp_dir+MD.lines_in)
+    os.unlink(temp_dir+MD.summary_out)
+    os.unlink(temp_dir+MD.standard_out)
+    os.unlink(temp_dir+logfile)
     if os.path.isfile(temp_dir+'fort.99'):
         os.unlink(temp_dir+'fort.99')
 
@@ -301,15 +306,17 @@ def cog(Star, species, cog_id):
     k = Star.linelist['species'] == species
     #negs = [wx for wx in Star.linelist['wavelength'][k] if wx < 0]
     MD = Driver(mode='cog')
-    MD.create_file()
-    create_model_in(Star)
-    found_lines = create_lines_in(Star, species=species)
+    MD.create_file(temporary_dir=temp_dir)
+    create_model_in(Star,temporary_dir=temp_dir)
+    found_lines = create_lines_in(Star, species=species, temporary_dir=temp_dir)
     if not found_lines:
         logger.warning('Did not run cog (no lines found)')
         return False
-    os.system('cd '+temp_dir+' && MOOGSILENT > moog.log 2>&1')
+    os.chdir(temp_dir)
+    os.system('MOOGSILENT > '+logfile+' 2>&1 ')
+    os.chdir('../')
 
-    f = open(MD.summary_out, 'r')
+    f = open(temp_dir+MD.summary_out, 'r')
     line = f.readline()
     cog_obj = {}
     while line:
@@ -328,15 +335,15 @@ def cog(Star, species, cog_id):
             cog_obj[wavelength] = {'loggf': np.array(x), 'logrw': np.array(y)}
     f.close()
 
-    os.unlink(MD.file_name)
-    os.unlink(MD.model_in)
-    os.unlink(MD.lines_in)
-    os.unlink(MD.summary_out)
-    os.unlink(MD.standard_out)
+    os.unlink(temp_dir+MD.file_name)
+    os.unlink(temp_dir+MD.model_in)
+    os.unlink(temp_dir+MD.lines_in)
+    os.unlink(temp_dir+MD.summary_out)
+    os.unlink(temp_dir+MD.standard_out)
     os.unlink(temp_dir+'moog.log')
 
     setattr(Star, cog_id, cog_obj)
 
 
 def delete_tempdir():
-    os.system('rm -r ' + temp_dir)
+    os.system('rm -rf ' + temp_dir)
