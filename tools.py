@@ -30,6 +30,39 @@ def linfit(x, y):
     #return b, a, sigma, err_b, err_a
     return a, b, err_b
 
+def wlinear_fit(x, y, w) :
+    """
+    Fit (x,y,w) to a linear function, using exact formulae for weighted linear
+    regression. This code was translated from the GNU Scientific Library (GSL),
+    it is an exact copy of the function gsl_fit_wlinear.
+    This function computes the best-fit linear regression coefficients (c0,c1)
+    of the model Y = c_0 + c_1 X for the weighted dataset (x, y), two vectors
+    of length n with strides xstride and ystride. The vector w, of length n and
+    stride wstride, specifies the weight of each datapoint. The weight is the
+    reciprocal of the variance for each datapoint in y.
+    """
+    # LM Function added by me
+    # compute the weighted means and weighted deviations from the means
+    # wm denotes a "weighted mean", wm(f) = (sum_i w_i f_i) / (sum_i w_i)
+    W = np.sum(w)
+    wm_x = np.average(x,weights=w)
+    wm_y = np.average(y,weights=w)
+    dx = x-wm_x
+    dy = y-wm_y
+    wm_dx2 = np.average(dx**2,weights=w)
+    wm_dxdy = np.average(dx*dy,weights=w)
+    # In terms of y = a + b x
+    b = wm_dxdy / wm_dx2
+    a = wm_y - wm_x*b
+    cov_00 = (1.0/W) * (1.0 + wm_x**2/wm_dx2)
+    cov_11 = 1.0 / (W*wm_dx2)
+    cov_01 = -wm_x / (W*wm_dx2)
+    # Compute chi^2 = \sum w_i (y_i - (a + b * x_i))^2
+    chi2 = np.sum (w * (y-(a+b*x))**2)
+    #return a,b,cov_00,cov_11,cov_01,chi2
+    return b, a, cov_11
+
+
 def read_csv(csv_file, file_type=None):
     """Reads CSV file with header and sends data to dictionary
 
