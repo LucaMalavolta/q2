@@ -88,6 +88,9 @@ class Star:
             self.err_vt = err_vt
         logger.info('Star object successfully created.')
 
+        self.use_errors = False
+        # LM Flag added to check if EW error are to be used
+
     def __repr__(self):
         if hasattr(self, 'linelist'):
             nlines = len(self.linelist['wavelength'])
@@ -148,6 +151,7 @@ class Star:
                              'gf': Data.lines['gf'][idx],
                              'ew': Data.lines[self.name][idx],
                              'ew_e': Data.lines[self.name+'_err'][idy]}
+                self.use_errors = True
             else:
                 self.linelist = {'wavelength': Data.lines['wavelength'][idx],
                              'species': Data.lines['species'][idx],

@@ -147,11 +147,11 @@ def create_lines_in(Star, species=0, file_name='lines.in', add_error=False, temp
     """LM: Added flag to create a linelist with EWs increased by their errors"""
     if species > 0:
         idx = np.where(np.logical_and(Star.linelist['species'] == species,\
-                                       Star.linelist['ew'] >= 0.1))[0] #LucaMalavolta
+                                       Star.linelist['ew'] >= 0.1))[0] # LM
     else:
         #species = 0 means all species
         idx = np.where(np.logical_and(Star.linelist['species'] > species,\
-                                       Star.linelist['ew'] >= 0.1))[0] #LucaMalavolta
+                                       Star.linelist['ew'] >= 0.1))[0] # LM
 
     nlines = len(idx)
     if nlines == 0:
@@ -200,7 +200,7 @@ def create_lines_in(Star, species=0, file_name='lines.in', add_error=False, temp
     return True
 
 
-def abfind(Star, species, species_id, add_error=False):
+def abfind(Star, species, species_id):
     """Runs MOOG with abfind driver for a given Star and species
 
     Star is a star object; must have all attributes in place
@@ -210,7 +210,9 @@ def abfind(Star, species, species_id, add_error=False):
     s.fe2 #shows result from abfind
     MD is the moog driver object
     """
-    """LM: added a flag for the computation of perturbed abundances"""
+    """LM: added the computation of perturbed abundances"""
+    if Star.use_errors:
+        ab_pert = abfind_perturbed(Star, species)
 
     k = Star.linelist['species'] == species
     negs = [wx for wx in Star.linelist['wavelength'][k] if wx < 0]
@@ -281,16 +283,89 @@ def abfind(Star, species, species_id, add_error=False):
     if os.path.isfile(temp_dir+'fort.99'):
         os.unlink(temp_dir+'fort.99')
 
-    if add_error:
-        #ab_err = Star[species_id] ????
-        #Star[species_id]=
-        print 'Hey '
-    else:
-        x = {'ww': np.array(ww), 'ep': np.array(ep), 'ew': np.array(ew),\
-            'rew': np.array(rew), 'ab': np.array(ab), 'difab': np.array(difab)}
-        setattr(Star, species_id, x)
+    if not Star.use_errors:
+        ab_pert = np.array(ab)+0.01
+
+    x = {'ww': np.array(ww), 'ep': np.array(ep), 'ew': np.array(ew),\
+        'rew': np.array(rew), 'ab': np.array(ab), 'difab': np.array(difab),
+        'ab_e': np.abs(ab_pert-np.array(ab))}
+    setattr(Star, species_id, x)
     logger.info('Successfully ran abfind')
     return True
+
+def abfind_perturbed(Star, species):
+    """LM
+    Added to perform the computation of perturbed EWs
+
+    :return:
+    """
+    k = Star.linelist['species'] == species
+    negs = [wx for wx in Star.linelist['wavelength'][k] if wx < 0]
+    if len(negs) == 0:
+        MD = Driver() #normal
+    else:
+        MD = Driver() #hfs
+        MD.hfs_species = str(round(species))
+    if not os.path.exists(temp_dir):
+        os.mkdir(temp_dir)
+
+    MD.create_file('batch.par',temporary_dir=temp_dir)
+
+    create_model_in(Star, file_name=MD.model_in, temporary_dir=temp_dir)
+    found_lines = create_lines_in(Star, species=species, file_name=MD.lines_in, add_error=True, temporary_dir=temp_dir)
+    if not found_lines:
+        logger.warning('Did not run abfind (no lines found)')
+        return False
+    logfile ='moog.log'
+    os.chdir(temp_dir)
+    os.system('MOOGSILENT > '+logfile+' 2>&1 ')
+    os.chdir('../')
+    f = open(temp_dir + MD.summary_out, 'r')
+    line, stop = '', False
+    while line[0:10] != 'wavelength':
+        line = f.readline()
+    if 'ID' in line:
+        moogjul2014 = True
+    else:
+        moogjul2014 = False
+    while not stop: #looping required for multiple iterations (molecules)
+        ww, ep, ew, rew, ab, difab = [], [], [], [], [], []
+        while line:
+            line = f.readline()
+            if line[0:7] == 'average': break
+            linesplit = line.split()
+            if float(linesplit[6]) > 999.: #exclude dummies (hfs)
+                continue
+            ww.append(float(linesplit[0]))
+            if moogjul2014: #MOOGJUL2014 adds a new column 'ID' to moog.sum
+                ep.append(float(linesplit[2]))
+                ew.append(float(linesplit[4]))
+                rew.append(float(linesplit[5]))
+                ab.append(float(linesplit[6]))
+            else: #older versions of MOOG don't have 'ID' but 'EP' in 2nd col
+                ep.append(float(linesplit[1]))
+                ew.append(float(linesplit[3]))
+                rew.append(float(linesplit[4]))
+                ab.append(float(linesplit[5]))
+            difab.append(None)
+        while line: #to break out of multiple iterations loop if done
+            line = f.readline()
+            if line[0:10] == 'wavelength':
+                stop = False
+                break
+            stop = True
+    f.close()
+    os.unlink(temp_dir+MD.file_name)
+    os.unlink(temp_dir+MD.model_in)
+    os.unlink(temp_dir+MD.lines_in)
+    os.unlink(temp_dir+MD.summary_out)
+    os.unlink(temp_dir+MD.standard_out)
+    os.unlink(temp_dir+logfile)
+    if os.path.isfile(temp_dir+'fort.99'):
+        os.unlink(temp_dir+'fort.99')
+
+    return np.array(ab)
+
 
 
 def cog(Star, species, cog_id):

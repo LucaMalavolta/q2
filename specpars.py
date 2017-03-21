@@ -4,7 +4,7 @@ import logging
 import matplotlib.pyplot as plt
 import moog
 import errors
-from tools import linfit
+from tools import linfit, wlinear_fit
 from star import Star
 import datetime
 from scipy import ma
@@ -74,6 +74,8 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
         k2r = [i for i, w in zip(range(len(ww2r)), ww2r) if w in w2]
         afe1 = Star.fe1['ab'][k1] - Ref.fe1['ab'][k1r]
         afe2 = Star.fe2['ab'][k2] - Ref.fe2['ab'][k2r]
+        afe1_e = Star.fe1['ab_e'][k1]  # LM Reference star is supposed error-less
+        afe2_e = Star.fe2['ab_e'][k2]  # LM Reference star is supposed error-less
         rew1 = np.log10(1e-3*Star.fe1['ew'][k1]/Star.fe1['ww'][k1])
         rew2 = np.log10(1e-3*Star.fe2['ew'][k2]/Star.fe2['ww'][k2])
         ep1, ep2 = Star.fe1['ep'][k1], Star.fe2['ep'][k2]
@@ -85,6 +87,7 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
         Star.fe1['ew'], Star.fe2['ew'] = Star.fe1['ew'][k1], Star.fe2['ew'][k2]
         Star.fe1['rew'], Star.fe2['rew'] =rew1, rew2
         Star.fe1['ab'], Star.fe2['ab'] = Star.fe1['ab'][k1], Star.fe2['ab'][k2]
+        Star.fe1['ab_e'], Star.fe2['ab_e'] = Star.fe1['ab_e'][k1], Star.fe2['ab_e'][k2]
         Star.fe1['difab'], Star.fe2['difab'] = afe1, afe2
         #
         if plot:
@@ -95,6 +98,8 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
         w1, w2 = Star.fe1['ww'], Star.fe2['ww']
         afe1 = Star.fe1['ab']
         afe2 = Star.fe2['ab']
+        afe1_e = Star.fe1['ab_e']
+        afe2_e = Star.fe2['ab_e']
         rew1 = np.log10(1e-3*Star.fe1['ew']/w1)
         rew2 = np.log10(1e-3*Star.fe2['ew']/w2)
         ep1, ep2 = Star.fe1['ep'], Star.fe2['ep']
@@ -107,8 +112,14 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
     eafe = np.std(list(afe1)+list(afe2))
     nfe1, nfe2 = len(afe1), len(afe2)
 
-    zero_ep, slope_ep, err_slope_ep = linfit(ep1, afe1)
-    zero_rew, slope_rew, err_slope_rew = linfit(rew1, afe1)
+    # LM  Linear fit is substituted with weighted fit
+    afe1_v = 1./(afe1_e**2)
+    afe2_v = 1./(afe2_e**2)
+    zero_ep, slope_ep, err_slope_ep = wlinear_fit(ep1, afe1, afe1_v)
+    zero_rew, slope_rew, err_slope_rew = wlinear_fit(rew1, afe1, afe1_v)
+    # zero_ep, slope_ep, err_slope_ep = linfit(ep1, afe1)
+    # zero_rew, slope_rew, err_slope_rew = linfit(rew1, afe1)
+
     x_epfit = np.array([min(ep1), max(ep1)])
     y_epfit = zero_ep + slope_ep*x_epfit
     x_rewfit = np.array([min(rew1), max(rew1)])
