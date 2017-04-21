@@ -45,12 +45,12 @@ def wlinear_fit(x, y, w) :
     # compute the weighted means and weighted deviations from the means
     # wm denotes a "weighted mean", wm(f) = (sum_i w_i f_i) / (sum_i w_i)
     W = np.sum(w)
-    wm_x = np.average(x,weights=w)
-    wm_y = np.average(y,weights=w)
+    wm_x = np.average(x, weights=w)
+    wm_y = np.average(y, weights=w)
     dx = x-wm_x
     dy = y-wm_y
-    wm_dx2 = np.average(dx**2,weights=w)
-    wm_dxdy = np.average(dx*dy,weights=w)
+    wm_dx2 = np.average(dx**2, weights=w)
+    wm_dxdy = np.average(dx*dy, weights=w)
     # In terms of y = a + b x
     b = wm_dxdy / wm_dx2
     a = wm_y - wm_x*b

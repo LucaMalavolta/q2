@@ -10,7 +10,7 @@ from scipy import ma
 from collections import OrderedDict
 from bokeh.plotting import *
 from bokeh.models import HoverTool
-
+import copy
 logger = logging.getLogger(__name__)
 
 
@@ -25,6 +25,13 @@ class SolvePars:
         self.errors = False
         self.check_converged = True
         self.ignore = []
+
+        self.step_teff_alt = 50.0
+        self.step_logg_alt = 0.10
+        self.step_vmic_alt = 0.10
+        self.stef_gfeh_alt = 0.10
+        self.i2_teff = 7
+        self.i2_vmib
 
 class PlotPars:
     def __init__(self):
@@ -56,6 +63,13 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
     if not fe1_done and not fe2_done:
         logger.warning('No fe1/fe2 attribute(s) added to '+Star.name)
         return None
+
+    # LM create a conditionnl array if not present already
+    if 'cond' not in Star.fe1:
+        Star.fe1['flag'] = np.ones(np.size(Star.fe1['ep']), dtype=bool)
+    if 'cond' not in Star.fe2:
+        Star.fe2['flag'] = np.ones(np.size(Star.fe2['ep']), dtype=bool)
+
     if hasattr(Ref, 'name'):
         logger.info('Differential analysis. Reference star is '+Ref.name)
         if not (hasattr(Ref, 'fe1')):
@@ -88,7 +102,9 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
         Star.fe1['ab'], Star.fe2['ab'] = Star.fe1['ab'][k1], Star.fe2['ab'][k2]
         Star.fe1['ab_e'], Star.fe2['ab_e'] = Star.fe1['ab_e'][k1], Star.fe2['ab_e'][k2]
         Star.fe1['difab'], Star.fe2['difab'] = afe1, afe2
-        #
+        # Added by LM
+        Star.fe1['flag'], Star.fe2['flag'] = Star.fe1['flag'][k1], Star.fe2['flag'][k2]
+
         if plot:
             #ylabel = '$\Delta$[Fe/H]'
             ylabel = '[Fe/H]'
@@ -112,8 +128,11 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
     nfe1, nfe2 = len(afe1), len(afe2)
 
     # LM  Linear fit is substituted with weighted fit
-    afe1_v = 1./(afe1_e**2)
-    afe2_v = 1./(afe2_e**2)
+    # afe1_v = 1./(afe1_e**2)
+    afe1_v = (0.05/afe1_e)**2
+    afe1_v[np.asarray(afe1_e) < 0.05] = 1.00 # to avoid giving too much weight to unrealistically small error bars
+    afe1_v[not Star.fe1['cond']] = 0.00
+
     zero_ep, slope_ep, err_slope_ep = wlinear_fit(ep1, afe1, afe1_v)
     zero_rew, slope_rew, err_slope_rew = wlinear_fit(rew1, afe1, afe1_v)
     # zero_ep, slope_ep, err_slope_ep = linfit(ep1, afe1)
@@ -214,8 +233,10 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
          'afe1': round(mfe1, 3), 'err_afe1': round(efe1, 3), 'nfe1': nfe1,
          'afe2': round(mfe2, 3), 'err_afe2': round(efe2, 3), 'nfe2': nfe2,
          'slope_ep': slope_ep,
+         'zero_ep': zero_ep, # Added by LM
          'err_slope_ep': err_slope_ep,
          'slope_rew': slope_rew,
+         'zero_rew': zero_rew, # Added by LM
          'err_slope_rew': err_slope_rew,
          'reference': ref_star}
     Star.iron_stats = x
@@ -377,8 +398,8 @@ def solve_one(Star, SolveParsInit, Ref=object, PlotPars=object):
     print('------------------------------------------------------')
 
     Star.sp_err = {'teff': 0, 'logg': 0, 'afe': 0, 'vt': 0}
-    if ((Star.converged and sp.errors == True) or \
-        (sp.niter == 0 and sp.errors == True and Star.converged != '')):
+    if ((Star.converged and sp.errors) or \
+        (sp.niter == 0 and sp.errors and Star.converged != '')):
         errors.error_one(Star, sp, Ref)
         Star.err_teff = int(Star.sp_err['teff'])
         Star.err_logg = Star.sp_err['logg']
@@ -399,6 +420,97 @@ def solve_one(Star, SolveParsInit, Ref=object, PlotPars=object):
               format(Star.vt, Star.sp_err['vt']))
         print('------------------------------------------------------')
 
+def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
+    """ different optimization algorith introduced by LMalavolta
+    """
+    sp = SolvePars()
+    sp.__dict__ = SolveParsInit.__dict__.copy()
+    if not hasattr(Star, 'model_atmosphere_grid'):
+        logger.info('Star has no model yet. Calculating.')
+        Star.get_model_atmosphere(sp.grid)
+    if not hasattr(Star, 'model_atmosphere'):
+        print('Unable to find a starting model atmosphere for this star')
+        return None
+    if Star.model_atmosphere_grid != sp.grid:
+        logger.info('Inconsistent model atmosphere grids '+
+                     '(Star and SolvePars). '+
+                     'Fixing problem now.')
+        Star.get_model_atmosphere(sp.grid)
+
+    if hasattr(Ref, 'name'):
+        if not hasattr(Ref, 'model_atmosphere_grid'):
+            logger.info('Ref star has no model yet. Calculating.')
+            Ref.get_model_atmosphere(sp.grid)
+        if Ref.model_atmosphere_grid != sp.grid:
+            logger.info('Inconsistent model atmosphere grids '+
+                         '(Ref star and SolvePars). '+
+                         'Fixing problem now.')
+            Ref.get_model_atmosphere(sp.grid)
+
+    dtv, dgv, dvv, stop_iter = [], [], [], False
+    if hasattr(Star, 'converged'):
+        if not Star.converged:
+            Star.converged = False
+    else:
+        Star.converged = False
+    Star.stop_iter = sp.niter
+    if sp.niter == 0:
+        Star.converged = True
+
+    print('it Teff logg [Fe/H]  vt           [Fe/H]')
+    print('-- ---- ---- ------ ----      --------------')
+
+    # LM: no dofference with the orginal algorithm until now
+
+    ## Here: pseudo code in fortran
+    for iQP in xrange(0, QP_size):
+        if iQP == 0:
+            sigma_rej = 5
+        elif iQP == 1:
+            sigma_rej = 4
+        elif iQP == 2:
+            sigma_rej = 3
+        else:
+            sigma_rej = 2
+
+        # rejection of outliers
+        afe1_model = Star.iron_stats['zero_ep'] + Star.iron_stats['slope_ep'] * Star.fe1['ep']
+        afe2_model = Star.iron_stats['zero_ep'] + Star.iron_stats['slope_ep'] * Star.fe2['ep']
+        Star.fe1['cond'] = (np.abs(afe1_model - Star.fe1['ab']) < sigma_rej * Star.iron_stat['err_afe1'])
+        Star.fe2['cond'] = (np.abs(afe2_model - Star.fe2['ab']) < sigma_rej * Star.iron_stat['err_afe2'])
+
+        # teff = teff_out ;  logg = logg_out ;  vmic = vmic_out ;  gfeh = gfeh_out
+        teff_cycle_status = True
+        vmic_cycle_status = True
+        logg_cycle_status = True
+        gfeh_cycle_status = True
+
+        # ??
+        # teff_var = teff_out
+        # logg_var = logg_out
+        # vmic_var = vmic_out
+        # gfeh_var = gfeh_out
+        Star_copy = copy.deepcopy(Star)
+
+        count_iters = 0
+        count_recurs = 0
+
+        #if teff_fix then
+           #teff_var = teff_inp
+           #teff_err1 = 30.0
+           #teff_cycle_status = .false.
+        #else
+
+        interp_coeff = np.arange([sp.i2_teff, 4], dtype=np.double)
+
+
+        for ii in xrange(0, sp.i2_teff):
+            Star_copy.teff = Star.teff + sp.step_teff_alt * (ii-sp.i2_teff/2)
+            Star.get_model_atmosphere(sp.grid)
+            is_done = iron_stats(Star_copy, Ref=Ref, plot=plot, PlotPars=PlotPars)
+            if is_done:
+                interp_coeff[ii, 0] = Star_copy.teff
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAAHHHHHH
 
 def solve_all(Data, SolveParsInit, output_file, reference_star=None,
               PlotPars=object, ultra_verbose=False): #LM Added ultra_verbose
