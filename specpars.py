@@ -641,7 +641,6 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
 
             Star_copy.get_model_atmosphere(sp.grid)
             is_done = iron_stats(Star_copy, Ref=Ref, plot=plot, PlotPars=PlotPars)
-
             gfeh_iter = Star_copy.feh
 
             # Check how far the new values are with respect to the initial values while keeping into account the associated errors
