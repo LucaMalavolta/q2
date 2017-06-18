@@ -55,7 +55,7 @@ class SolvePars:
         self.logg_crit = [0.01, 0.10]
         self.gfeh_crit = [0.01, 0.10]
 
-        self.count_iters_limit = 3
+        self.count_iters_limit = 2
         self.count_recurs_limit = 25
         self.iter_poly_order = 2
         self.QP = [0.25, 0.25, 1., 2.]
@@ -641,7 +641,7 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
 
             Star_copy.get_model_atmosphere(sp.grid)
             is_done = iron_stats(Star_copy, Ref=Ref, plot=plot, PlotPars=PlotPars)
-            gfeh_iter = Star_copy.feh
+            gfeh_iter = Star_copy.iron_stats['afe1'] - sp.solar_afe
 
             # Check how far the new values are with respect to the initial values while keeping into account the associated errors
             teff_crit = min(max(Star.sp_err['teff'] / sp.QP[iQP], sp.teff_crit[0]), sp.teff_crit[1])
