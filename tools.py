@@ -60,7 +60,7 @@ def wlinear_fit(x, y, w) :
     # Compute chi^2 = \sum w_i (y_i - (a + b * x_i))^2
     chi2 = np.sum (w * (y-(a+b*x))**2)
     #return a,b,cov_00,cov_11,cov_01,chi2
-    return b, a, cov_11
+    return a, b, cov_11
 
 
 def read_csv(csv_file, file_type=None):
