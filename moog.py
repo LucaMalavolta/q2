@@ -1,12 +1,8 @@
 import numpy as np
 import os
 import logging
-<<<<<<< HEAD
 import tempfile
-from config import *
-=======
 from .config import *
->>>>>>> astroChasqui/master
 
 logger = logging.getLogger(__name__)
 

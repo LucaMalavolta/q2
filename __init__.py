@@ -12,8 +12,8 @@ import matplotlib
 matplotlib.use('Agg')
 from .config import *
 from .star import *
-from . import moog, specpars, errors, abundances
-from . import isopars
+import moog, specpars, errors, abundances
+import isopars
 import logging
 import get_model
 

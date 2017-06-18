@@ -140,8 +140,7 @@ class Star:
         # gets line data excluding cells with no ew:
         #if hasattr(Data, 'lines'):
         if Data.lines:
-<<<<<<< HEAD
-            idx = np.where(Data.lines[self.name] >= 0)
+            idx = np.where(Data.lines[self.name] != np.nan)
 
             # LM Added by me
             if self.name+'_err' in Data.lines:
@@ -155,10 +154,6 @@ class Star:
                 self.use_errors = True
             else:
                 self.linelist = {'wavelength': Data.lines['wavelength'][idx],
-=======
-            idx = np.where(Data.lines[self.name] != np.nan)
-            self.linelist = {'wavelength': Data.lines['wavelength'][idx],
->>>>>>> astroChasqui/master
                              'species': Data.lines['species'][idx],
                              'ep': Data.lines['ep'][idx],
                              'gf': Data.lines['gf'][idx],
