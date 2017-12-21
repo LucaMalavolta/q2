@@ -180,8 +180,10 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
     if plot:
         logger.info('Making figure')
         plt.figure(figsize=(7, 9))
-        title = Star.name + ' : ' + str(Star.teff) + ', ' + str(Star.logg) + ', ' \
-                + str(round(Star.feh, 3)) + ', ' + str(Star.vt)
+
+        title = Star.name+' : '+str(int(Star.teff))+', '+str(Star.logg)+', ' \
+                +str(round(Star.feh,3))+', '+str(Star.vt)
+
         if hasattr(Ref, 'name'):
             title += ' [' + Ref.name + ']'
         if hasattr(PlotPars, 'title'):
@@ -189,13 +191,6 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
                 title = PlotPars.title
         plt.suptitle(title, fontsize=16)
         plt.subplots_adjust(hspace=0.35, top=0.93, left=0.2)
-        plt.rc("axes", labelsize=15, titlesize=12)
-        plt.rc("xtick", labelsize=14)
-        plt.rc("ytick", labelsize=14)
-        plt.rc("xtick.major", size=6, width=1)
-        plt.rc("ytick.major", size=6, width=1)
-        plt.rc("lines", markersize=10, markeredgewidth=2)
-        plt.rc("lines", linewidth=3)
 
         try:
             if PlotPars.afe[0] != -1000:
@@ -217,7 +212,7 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
                          plt.ylim()[0] + 0.85 * (plt.ylim()[1] - plt.ylim()[0]),
                          PlotPars.title_inside,
                          horizontalalignment='center',
-                         size=15)
+                         size=16)
         panel_b = plt.subplot(312)
         plt.xlabel('REW = log (EW/$\lambda$)')
         plt.ylabel(ylabel)
@@ -226,7 +221,7 @@ def iron_stats(Star, Ref=object, plot=None, PlotPars=object, silent=True):
         plt.ylim(ylim)
 
         panel_c = plt.subplot(313)
-        plt.xlabel('Wavelength ($\AA$)')
+        plt.xlabel('Wavelength ($\mathrm{\AA}$)')
         plt.ylabel(ylabel)
         try:
             plt.xlim(PlotPars.wavelength_range[0], PlotPars.wavelength_range[1])
@@ -924,8 +919,9 @@ def fancy_ironstats_plot(Star):
         ab = np.concatenate((Star.fe1['ab'], Star.fe2['ab']))
         y_axis_label = 'A(Fe)'
     ws = [str(round(w, 1)) for w in ww]
-    colors = np.concatenate((["blue"] * len(Star.fe1['ww']),
-                             ["green"] * len(Star.fe2['ww'])))
+
+    #colors = np.concatenate((["blue"] * len(Star.fe1['ww']),
+    #                         ["green"] * len(Star.fe2['ww'])))
 
     TOOLS = "pan,wheel_zoom,box_zoom,reset,hover"
     output_notebook()
@@ -937,9 +933,18 @@ def fancy_ironstats_plot(Star):
     p1 = figure(title=title, plot_width=650, plot_height=300,
                 x_axis_label='EP (eV)',
                 y_axis_label=y_axis_label,
-                tools=TOOLS)
+                tools=TOOLS, active_scroll = 'wheel_zoom')
+    p1.xaxis.axis_label_text_font_style = "normal"
+    p1.xaxis.axis_label_text_font_size = "12pt"
+    p1.xaxis.major_label_text_font_size = "12pt"
+    p1.yaxis.axis_label_text_font_style = "normal"
+    p1.yaxis.axis_label_text_font_size = "12pt"
+    p1.yaxis.major_label_text_font_size = "12pt"
 
     abst = [str(round(xab, 3)) for xab in ab]
+
+    colors = np.concatenate((["white"]*len(Star.fe1['ww']),
+                             ["green"]*len(Star.fe2['ww'])))
     source = ColumnDataSource(
         data=dict(
             ws=ws,
@@ -951,9 +956,28 @@ def fancy_ironstats_plot(Star):
             colors=colors,
         )
     )
+    p1.scatter('ep', 'ab', size=11, color='colors',
+            source=source, marker='circle')
 
-    p1.scatter('ep', 'ab', size=10, color='colors',
-               source=source, marker='square')
+    #p1.scatter('ep', 'ab', size=10, color='colors',
+    #           source=source, marker='square')
+
+    colors = np.concatenate((["blue"]*len(Star.fe1['ww']),
+                             ["green"]*len(Star.fe2['ww'])))
+    source = ColumnDataSource(
+        data=dict(
+            ws = ws,
+            ep = ep,
+            rew = rew,
+            ab = ab,
+            abst = abst,
+            ew = ew,
+            colors = colors,
+        )
+    )
+    p1.scatter('ep', 'ab', size=11, line_width=2, color='colors',
+            source=source, marker='cross')
+
 
     hover = p1.select(dict(type=HoverTool))
     hover.tooltips = OrderedDict([
@@ -967,10 +991,48 @@ def fancy_ironstats_plot(Star):
     p2 = figure(title='', plot_width=650, plot_height=300,
                 x_axis_label='REW',
                 y_axis_label=y_axis_label,
-                tools=TOOLS)
+                tools=TOOLS, active_scroll = 'wheel_zoom')
+    p2.xaxis.axis_label_text_font_style = "normal"
+    p2.xaxis.axis_label_text_font_size = "12pt"
+    p2.xaxis.major_label_text_font_size = "12pt"
+    p2.yaxis.axis_label_text_font_style = "normal"
+    p2.yaxis.axis_label_text_font_size = "12pt"
+    p2.yaxis.major_label_text_font_size = "12pt"
 
-    p2.scatter('rew', 'ab', size=10, color='colors',
-               source=source, marker='square')
+    colors = np.concatenate((["white"]*len(Star.fe1['ww']),
+                             ["green"]*len(Star.fe2['ww'])))
+    source = ColumnDataSource(
+        data=dict(
+            ws = ws,
+            ep = ep,
+            rew = rew,
+            ab = ab,
+            abst = abst,
+            ew = ew,
+            colors = colors,
+        )
+    )
+    p2.scatter('rew', 'ab', size=11, color='colors',
+            source=source, marker='circle')
+
+    #p2.scatter('rew', 'ab', size=10, color='colors',
+    #           source=source, marker='square')
+
+    colors = np.concatenate((["blue"]*len(Star.fe1['ww']),
+                             ["green"]*len(Star.fe2['ww'])))
+    source = ColumnDataSource(
+        data=dict(
+            ws = ws,
+            ep = ep,
+            rew = rew,
+            ab = ab,
+            abst = abst,
+            ew = ew,
+            colors = colors,
+        )
+    )
+    p2.scatter('rew', 'ab', size=11, line_width=2, color='colors',
+            source=source, marker='cross')
 
     hover = p2.select(dict(type=HoverTool))
     hover.tooltips = OrderedDict([

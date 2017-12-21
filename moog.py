@@ -147,11 +147,19 @@ def create_lines_in(Star, species=0, file_name='lines.in', add_error=False, temp
     """LM: Added flag to create a linelist with EWs increased by their errors"""
     if species > 0:
         idx = np.where(np.logical_and(Star.linelist['species'] == species,\
+<<<<<<< HEAD
                                        Star.linelist['ew'] >= 0.1))[0] # LM
     else:
         #species = 0 means all species
         idx = np.where(np.logical_and(Star.linelist['species'] > species,\
                                        Star.linelist['ew'] >= 0.1))[0] # LM
+=======
+                                      np.not_equal(Star.linelist['ew'],\
+                                                   None)))[0]
+    else:
+        #species = 0 means all species
+        idx = np.where(np.not_equal(Star.linelist['ew'], None))[0]
+>>>>>>> ce9a6df7ce4e33283a760d231a9994ac9abe53f4
 
     nlines = len(idx)
     if nlines == 0:
@@ -160,12 +168,12 @@ def create_lines_in(Star, species=0, file_name='lines.in', add_error=False, temp
     else:
         logger.info(str(nlines)+' lines found for '+Star.name)
     gf_values = Star.linelist['gf'][idx]
-    gf10 = [10**gfx for gfx in Star.linelist['gf'][idx] if gfx >= 0]
-    if len(gf10) == len(Star.linelist['gf'][idx]):
-        logger.info('all gf values for this species are positive --> 10^gf')
-        #gf_values = gf10
-        Star.linelist['gf'][idx] = gf10
-    #Star.linelist['gf'][idx] = gf_values
+    #gf10 = [10**gfx for gfx in Star.linelist['gf'][idx] if gfx >= 0]
+    #if len(gf10) == len(Star.linelist['gf'][idx]):
+    #    logger.info('all gf values for this species are positive --> 10^gf')
+    #    #gf_values = gf10
+    #    Star.linelist['gf'][idx] = gf10
+    ##Star.linelist['gf'][idx] = gf_values
 
     with open(temporary_dir+file_name, 'w') as f:
         f.write("MOOG linelist created by q2\n")
