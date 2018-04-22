@@ -455,6 +455,10 @@ def solve_one(Star, SolveParsInit, Ref=object, PlotPars=object):
 def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
     """ different optimization algorithm introduced by LMalavolta
     """
+    print "---> Using VARIANT"
+
+    reference_flag = False
+
     sp = SolvePars()
     sp.__dict__ = SolveParsInit.__dict__.copy()
     if not hasattr(Star, 'model_atmosphere_grid'):
@@ -479,7 +483,6 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
                         'Fixing problem now.')
             Ref.get_model_atmosphere(sp.grid)
 
-    dtv, dgv, dvv, stop_iter = [], [], [], False
     if hasattr(Star, 'converged'):
         if not Star.converged:
             Star.converged = False
@@ -493,15 +496,30 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
     print('-- ---- ---- ------ ----      --------------')
 
     # LM: no difference with the original algorithm until now
-    plot = None
-    is_done = iron_stats(Star, Ref=Ref, plot=plot, PlotPars=PlotPars)
-    Star.sp_err = {'teff': 0, 'logg': 0, 'afe': 0, 'vt': 0}
-    errors.error_one(Star, sp, Ref)
-
     ## Here: pseudo code in fortran
+
     for iQP in xrange(0, len(sp.QP)):
 
+        if sp.niter == 0:
+            plot = Star.name
+            if hasattr(Ref, 'name'):
+                plot = Star.name + '-' + Ref.name
+                if Star.name == Ref.name:
+                    plot = None
+                    Star.converged = ''
+                    reference_flag = True
+            is_done = iron_stats(Star, Ref=Ref, plot=plot, PlotPars=PlotPars)
+            print("{0:2.0f} {1:4.0f} {2:4.2f} {3:6.3f} {4:4.2f}" \
+                  " ---> {5:6.3f}+/-{6:5.3f}". \
+                  format(iQP, Star.teff, Star.logg, Star.feh, Star.vt,
+                         Star.iron_stats['afe'], Star.iron_stats['err_afe']))
+
+            break
+
+
         plot = None
+        is_done = iron_stats(Star, Ref=Ref, plot=plot, PlotPars=PlotPars)
+        errors.error_one(Star, sp, Ref)
 
         # rejection of outliers
         afe1_model = Star.iron_stats['zero_ep'] + Star.iron_stats['slope_ep'] * Star.fe1['ep']
@@ -565,6 +583,8 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
                 poly_coeff = np.polyfit(interp_coeff[sel_teff], teff_range[sel_teff], sp.iter_poly_order)
                 teff_iter = min(max(np.polyval(poly_coeff, 0.), sp.teff_min), sp.teff_max)
 
+            print  '   Result on teff iteration: ',Star.teff, '--->', teff_iter
+
             # Temperature of the Star copy object is set to the value at the start of the iteration
             Star_copy.teff = Star.teff
 
@@ -596,6 +616,8 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
             else:
                 poly_coeff = np.polyfit(interp_coeff[sel_vmic], vmic_range[sel_vmic], sp.iter_poly_order)
                 vmic_iter = min(max(np.polyval(poly_coeff, 0.), sp.vmic_min), sp.vmic_max)
+
+            print  '   Result on vmic iteration: ',Star.vt, '--->', vmic_iter
 
             # Microturbulent velocity of the Star copy object is set to the value at the start of the iteration
             Star_copy.vt = Star.vt
@@ -629,6 +651,8 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
                 poly_coeff = np.polyfit(interp_coeff[sel_logg], logg_range[sel_logg], sp.iter_poly_order)
                 logg_iter = min(max(np.polyval(poly_coeff, 0.), sp.logg_min), sp.logg_max)
 
+            print  '   Result on logg iteration: ', Star.logg, '--->', logg_iter
+
             # Get the new abundance with all the other photospheric parameters varied to the new values
             Star_copy.teff = teff_iter
             Star_copy.logg = logg_iter
@@ -636,7 +660,18 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
 
             Star_copy.get_model_atmosphere(sp.grid)
             is_done = iron_stats(Star_copy, Ref=Ref, plot=plot, PlotPars=PlotPars)
-            gfeh_iter = Star_copy.iron_stats['afe1'] - sp.solar_afe
+
+            if hasattr(Ref, 'name'):
+                gfeh_iter = Ref.feh + Star_copy.iron_stats['afe1']
+            else:
+                gfeh_iter = Star_copy.iron_stats['afe1'] - sp.solar_afe
+
+            if gfeh_iter > 1.0:
+                gfeh_iter = 1.0
+            if gfeh_iter> 0.5 and sp.grid != 'over':
+                gfeh_iter = 0.5
+
+            print  '   Result on gfeh iteration: ', Star.feh , '--->', gfeh_iter
 
             # Check how far the new values are with respect to the initial values while keeping into account the associated errors
             teff_crit = min(max(Star.sp_err['teff'] / sp.QP[iQP], sp.teff_crit[0]), sp.teff_crit[1])
@@ -659,14 +694,15 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
             Star.get_model_atmosphere(sp.grid)
 
             is_done = iron_stats(Star, Ref=Ref, plot=plot, PlotPars=PlotPars)
-            errors.error_one(Star, sp, Ref)
+
+            #errors.error_one(Star, sp, Ref)
             # Get the error on the new temperature
 
-            if not (teff_cycle_status or vmic_cycle_status or logg_cycle_status or gfeh_cycle_status) \
-                    and count_iters < sp.count_iters_limit:
-                count_iters += 1
-                teff_cycle_status = True
-                vmic_cycle_status = True
+            #if not (teff_cycle_status or vmic_cycle_status or logg_cycle_status or gfeh_cycle_status) \
+            #        and count_iters < sp.count_iters_limit:
+            #    count_iters += 1
+            #    teff_cycle_status = True
+            #    vmic_cycle_status = True
 
             count_recurs += 1
             Star.stop_iter = count_recurs
@@ -747,7 +783,7 @@ def solve_one_variant(Star, SolveParsInit, Ref=object, PlotPars=object):
 
 
 def solve_all(Data, SolveParsInit, output_file, reference_star=None,
-              PlotPars=object, ultra_verbose=False):  # LM Added ultra_verbose
+              PlotPars=object, use_variant=False, ultra_verbose=False):  # LM Added ultra_verbose
     print('------------------------------------------------------')
     print('Initializing ...')
     start_time = datetime.datetime.now()
@@ -810,7 +846,10 @@ def solve_all(Data, SolveParsInit, output_file, reference_star=None,
             print('Asked to ignore.')
             continue
 
-        solve_one(s, sp, Ref, PlotPars=PlotPars)
+        if use_variant:
+            solve_one_variant(s, sp, Ref, PlotPars=PlotPars)
+        else:
+            solve_one(s, sp, Ref, PlotPars=PlotPars)
 
         if sp.niter == 0:
             s.converged = ''

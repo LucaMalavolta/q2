@@ -147,19 +147,11 @@ def create_lines_in(Star, species=0, file_name='lines.in', add_error=False, temp
     """LM: Added flag to create a linelist with EWs increased by their errors"""
     if species > 0:
         idx = np.where(np.logical_and(Star.linelist['species'] == species,\
-<<<<<<< HEAD
                                        Star.linelist['ew'] >= 0.1))[0] # LM
     else:
         #species = 0 means all species
         idx = np.where(np.logical_and(Star.linelist['species'] > species,\
                                        Star.linelist['ew'] >= 0.1))[0] # LM
-=======
-                                      np.not_equal(Star.linelist['ew'],\
-                                                   None)))[0]
-    else:
-        #species = 0 means all species
-        idx = np.where(np.not_equal(Star.linelist['ew'], None))[0]
->>>>>>> ce9a6df7ce4e33283a760d231a9994ac9abe53f4
 
     nlines = len(idx)
     if nlines == 0:
@@ -178,7 +170,7 @@ def create_lines_in(Star, species=0, file_name='lines.in', add_error=False, temp
     with open(temporary_dir+file_name, 'w') as f:
         f.write("MOOG linelist created by q2\n")
         if add_error:
-            print 'Adding errors to EWS - be careful! '
+            #print 'Adding errors to EWS - be careful! '
             """LM: EWs are increased by their corresponding errors. Error on abundance due
             to the error in EW will be calculated by subtracting the unperturbed
             abundance from this value """
@@ -188,7 +180,7 @@ def create_lines_in(Star, species=0, file_name='lines.in', add_error=False, temp
                     Star.linelist['species'][lidx],\
                     Star.linelist['ep'][lidx],\
                     Star.linelist['gf'][lidx],\
-                    Star.linelist['ew'][lidx]+Star.linelist['ew_r'][lidx])
+                    Star.linelist['ew'][lidx]+Star.linelist['ew_e'][lidx])
                    )
                 # LM switched from '3 0' to '0 0', ie use the Unsold approximation
                 # when Barklem values are not avaialble

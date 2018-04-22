@@ -174,3 +174,4 @@ def error_one(Star_in, SolvePars, Ref=object):
     ea = np.sqrt(eat**2+eag**2+eav**2+s2**2)
 
     Star_in.sp_err = {'teff': int(eteff), 'logg': elogg, 'afe': ea, 'vt': evt}
+
