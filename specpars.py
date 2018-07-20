@@ -27,6 +27,11 @@ class SolvePars:
         self.check_converged = True
         self.ignore = []
 
+        # stopping criteria
+        self.step_teff_stop_criteria = 1
+        self.step_logg_stop_criteria = 0.01
+        self.step_vt_stop_criteria = 0.01
+
         # LM boundaries for parameter exploration
         self.teff_min = 4100.0
         self.teff_max = 7000.0
@@ -318,8 +323,9 @@ def solve_one(Star, SolveParsInit, Ref=object, PlotPars=object):
     print('-- ---- ---- ------ ----      --------------')
 
     for i in range(sp.niter + 1):
-        if sp.step_teff <= 1 and sp.step_logg <= 0.01 \
-                and sp.step_vt <= 0.01:
+        if sp.step_teff <= sp.step_teff_stop_criteria \
+                and sp.step_logg <= sp.step_logg_stop_criteria \
+                and sp.step_vt <= sp.step_vt_stop_criteria:
             if not stop_iter:
                 Star.converged = False
                 if SolveParsInit.niter > 0:
@@ -380,6 +386,7 @@ def solve_one(Star, SolveParsInit, Ref=object, PlotPars=object):
         dvv.append(Star.vt)
 
         if i >= 4:
+            print('std: ', np.std(dtv[-5:]), np.std(dgv[-5:]), np.std(dvv[-5:]))
             if np.std(dtv[-5:]) <= 0.8 * sp.step_teff and \
                             np.std(dgv[-5:]) <= 0.8 * sp.step_logg and \
                             np.std(dvv[-5:]) <= 0.8 * sp.step_vt:
@@ -396,11 +403,12 @@ def solve_one(Star, SolveParsInit, Ref=object, PlotPars=object):
                 sp.step_teff = sp.step_teff / 2
                 sp.step_logg = sp.step_logg / 2
                 sp.step_vt = sp.step_vt / 2
-                if sp.step_teff < 1 and sp.step_teff > 0:
+                print ('-- new steps: '+str(sp.step_teff), str(sp.step_logg), str(sp.step_vt))
+                if sp.step_teff < sp.step_teff_stop_criteria and sp.step_teff > 0:
                     sp.step_teff = 1
-                if sp.step_logg < 0.01 and sp.step_logg > 0:
+                if sp.step_logg < sp.step_logg_stop_criteria and sp.step_logg > 0:
                     sp.step_logg = 0.01
-                if sp.step_vt < 0.01 and sp.step_vt > 0:
+                if sp.step_vt < sp.step_vt_stop_criteria and sp.step_vt > 0:
                     sp.step_vt = 0.01
 
     if not Star.converged:
