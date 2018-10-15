@@ -28,7 +28,7 @@ class SolvePars:
         self.ignore = []
 
         # stopping criteria
-        self.step_teff_stop_criteria = 1
+        self.step_teff_stop_criteria = 1.
         self.step_logg_stop_criteria = 0.01
         self.step_vt_stop_criteria = 0.01
 

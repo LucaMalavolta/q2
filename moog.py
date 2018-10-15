@@ -282,7 +282,8 @@ def abfind(Star, species, species_id):
     os.unlink(temp_dir+logfile)
     if os.path.isfile(temp_dir+'fort.99'):
         os.unlink(temp_dir+'fort.99')
-
+    delete_tempdir()
+    
     if not Star.use_errors:
         ab_pert = np.array(ab)+0.01
 
@@ -363,6 +364,7 @@ def abfind_perturbed(Star, species):
     os.unlink(temp_dir+logfile)
     if os.path.isfile(temp_dir+'fort.99'):
         os.unlink(temp_dir+'fort.99')
+    delete_tempdir()
 
     return np.array(ab)
 
@@ -418,7 +420,7 @@ def cog(Star, species, cog_id):
     os.unlink(temp_dir+'moog.log')
 
     setattr(Star, cog_id, cog_obj)
-
+    delete_tempdir()
 
 def delete_tempdir():
     os.system('rm -rf ' + temp_dir)

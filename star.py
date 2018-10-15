@@ -158,7 +158,7 @@ class Star:
                              'ep': Data.lines['ep'][idx],
                              'gf': Data.lines['gf'][idx],
                              'ew': Data.lines[self.name][idx],
-                             'ew_e': Data.lines[self.name][idx]*0+1.0000}
+                             'ew_e': [1.000] * len(Data.lines[self.name][idx])}
             logger.info('Attribute linelist added to star object.')
         else:
             logger.warning('There is no line data to attach to Star object.')

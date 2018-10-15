@@ -11,7 +11,6 @@ def get_model(teff, logg, vt, feh, grid,  file_name='model.in', temporary_dir=''
     model_atmosphere = modatm.interpolate(teff, logg, feh, grid)
     model_atmosphere_grid = grid
 
-
     with open(temporary_dir+'head.tmp', 'w') as f:
         f.write('KURUCZ\n')
         f.write('TEFF='+str(teff)+',LOGG='+str(logg)+
