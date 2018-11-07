@@ -93,9 +93,13 @@ def get_all(Data, output_file, species_ids=None, reference=None, grid='odfnew',
                 da = getattr(s, species_id)['difab']
                 da = np.array(da, dtype=np.float) #convert None to np.nan
                 mda = np.ma.masked_array(da, np.isnan(da))
-                mdifab = np.mean(mda)
-                sdifab = np.std(mda)
                 ndifab = mda.count()
+                if ndifab > 0:
+                    mdifab = np.mean(mda)
+                    sdifab = np.std(mda)
+                else:
+                    mdifab = -99.0
+                    sdifab = -99.0
                 print("DIF = {0:6.3f} +/- {1:6.3f} , n = {2:.0f}".\
                       format(mdifab, sdifab, ndifab))
                 line += ',{0:.3f},{1:.3f},{2:.0f}'.\
