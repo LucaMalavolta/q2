@@ -64,8 +64,10 @@ def get_all(Data, output_file, species_ids=None, reference=None, grid='odfnew',
                 s.feh = getattr(s, 'feh_model')
             s.get_model_atmosphere(grid)
         except:
-            print('No data available')
+            print('No data available (1)')
             logger.warning('Could not get all the necessary data')
+            print(len(species_ids))
+
             line += ','*(len(species_ids)*2)
             if reference:
                 line += ','*(len(species_ids)*2)
@@ -76,12 +78,14 @@ def get_all(Data, output_file, species_ids=None, reference=None, grid='odfnew',
         for species_id in species_ids:
             print('\n'+species_id+'\n'+'-'*len(species_id))
             if not hasattr(s, species_id):
-                print('No data available')
+                print('No data available (2)')
                 logger.warning('There are no '+species_id+' abundances '+\
                                'for this star')
-                line += ',,'
+                line += ',,,'
                 if reference:
-                    line += ',,'
+                    line += ',,,'
+                if error:
+                    line += ','
                 continue
             mab = np.mean(getattr(s, species_id)['ab'])
             sab = np.std(getattr(s, species_id)['ab'])
